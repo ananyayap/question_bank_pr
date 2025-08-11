@@ -1,0 +1,5 @@
+#put .env and firebase-key.json in gitignore
+# This file is used to ignore files that should not be tracked by git.
+
+.env
+firebase-key.json
