@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # 1. Extract text from your resource file
     # Make sure you have a 'resources/books' directory with 'book1.pdf' inside
     print("Extracting text from PDF...")
-    text = extract_text_from_pdf("resources/books/book1.pdf")
+    text = extract_text_from_pdf("resources/Notes/A.pdf")
 
     # 2. Chunk the text
     chunks = chunk_text(text)
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # 3. Pick section for this run
     section = "math"  # You can change this to "reading" or "writing"
-    num_questions = 2 # Number of questions to generate per chunk
+    num_questions = 1 # Number of questions to generate per chunk
 
     # 4. Generate questions for each difficulty and upload
     for difficulty in DIFFICULTIES:

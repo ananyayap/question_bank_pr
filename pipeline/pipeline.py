@@ -6,16 +6,16 @@ from config.settings import SECTION_TAGS, DETAILED_SYLLABUS # Import the tags an
 def tag_question_by_concept(question_text: str, section: str) -> list:
     """
     Uses the LLM to assign relevant tags to a question based on the section's syllabus.
+    This version correctly parses the JSON object returned by the AI.
     """
-    # Get the list of possible tags for the given section
     tags_list = SECTION_TAGS.get(section, [])
     if not tags_list:
-        return []
+        return ["untagged"]
 
     system_prompt = (
         "You are an expert curriculum developer. Based on the provided question, "
         "select the most relevant tags from the given list. "
-        "Return ONLY a JSON array of the selected tag strings."
+        "Return a JSON object with a single key 'tags' containing an array of the selected tag strings."
     )
 
     user_prompt = f"""
@@ -24,24 +24,27 @@ def tag_question_by_concept(question_text: str, section: str) -> list:
 
     AVAILABLE TAGS:
     {json.dumps(tags_list, indent=2)}
-
-    Select the most relevant tags from the list above.
     """
 
     try:
         resp = openai.chat.completions.create(
-            model="gpt-4o-mini", # Using a smaller model for efficiency
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0,
-            response_format={"type": "json"}
+            response_format={"type": "json_object"}
         )
-        return json.loads(resp.choices[0].message.content)
+
+        
+        # We parse the JSON and then correctly extract the list from the "tags" key.
+        result = json.loads(resp.choices[0].message.content)
+        return result.get("tags", ["untagged"]) # Use .get() for safety
+
     except Exception as e:
-        print(f"Error tagging question: {e}")
-        return []
+        print(f"ERROR during tagging: {e}")
+        return ["tagging_error"]
 
 
 def generate_mcqs(chunk, difficulty, section, num_questions=2):
