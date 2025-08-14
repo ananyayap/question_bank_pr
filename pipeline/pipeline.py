@@ -1,7 +1,6 @@
 import json
 import openai
-from config.settings import SECTION_TAGS, DETAILED_SYLLABUS # Import the tags and detailed syllabus
-
+from config.settings import DETAILED_SYLLABUS, SECTION_TAGS
 
 def tag_question_by_concept(question_text: str, section: str) -> list:
     """
@@ -17,14 +16,7 @@ def tag_question_by_concept(question_text: str, section: str) -> list:
         "select the most relevant tags from the given list. "
         "Return a JSON object with a single key 'tags' containing an array of the selected tag strings."
     )
-
-    user_prompt = f"""
-    QUESTION:
-    {question_text}
-
-    AVAILABLE TAGS:
-    {json.dumps(tags_list, indent=2)}
-    """
+    user_prompt = f"QUESTION:\n{question_text}\n\nAVAILABLE TAGS:\n{json.dumps(tags_list, indent=2)}"
 
     try:
         resp = openai.chat.completions.create(
@@ -36,87 +28,71 @@ def tag_question_by_concept(question_text: str, section: str) -> list:
             temperature=0,
             response_format={"type": "json_object"}
         )
-
-        
-        # We parse the JSON and then correctly extract the list from the "tags" key.
         result = json.loads(resp.choices[0].message.content)
-        return result.get("tags", ["untagged"]) # Use .get() for safety
-
+        return result.get("tags", ["untagged"])
     except Exception as e:
         print(f"ERROR during tagging: {e}")
         return ["tagging_error"]
 
-
-def generate_mcqs(chunk, difficulty, section, num_questions=2):
+def generate_mcqs(chunk, difficulty, section, num_questions=2, image_url=None):
     """
-    Generates exactly `num_questions` MCQs from a text chunk.
+    Generates MCQs using a sophisticated prompt. Now supports images.
     """
-     # 1. GET THE DETAILED SYLLABUS
-    syllabus_dict = DETAILED_SYLLABUS.get(section, {})
-    formatted_syllabus = "\n".join([f"- {topic}: {desc}" for topic, desc in syllabus_dict.items()])
-
-    
-
-    
-        
+    difficulty_definitions = {
+        "easy": "An 'easy' question should be straightforward, with clear information. It requires minimal interpretation or multi-step reasoning but should still be a valid SAT-style question, not a simple trivia fact.",
+        "medium": "A 'medium' question requires some interpretation, analysis, or multiple steps to solve. The answer may not be immediately obvious.",
+        "hard": "A 'hard' question is complex, requiring deep analysis or synthesis of multiple concepts. The answer choices may be deliberately tricky."
+    }
     system_prompt = (
-        f"You are an expert SAT {section} question creator.\n"
-        "Your task is to generate high-quality SAT-style multiple choice questions based on the detailed syllabus and reference text provided by the user.\n"
-        "You must match the requested difficulty and return your response exclusively in the JSON format shown below.\n"
-        "Ensure that the questions are clear, concise, and relevant to the SAT curriculum.\n"
-        "Each question should have 4 options labeled A, B, C, D, with one correct answer.\n"
-        "The questions should be challenging but fair, reflecting the SAT's standards.\n"
-        "The options should be plausible distractors, not obviously incorrect.\n"
-        """
-        [
-        {
-            "question_text": "...",
-            "options": {"A": "...", "B": "...", "C": "...", "D": "..."},
-            "correct": "A"
-        }
-        ]
-        """
+        f"You are an expert SAT {section} question creator, specializing in creating high-quality, realistic test questions.\n"
+        "Your task is to generate questions based based on the detailed syllabus and reference text provided by the user.\n.\n"
+        "Adhere strictly to the provided difficulty definition.\n"
+        "Return your response exclusively in the specified JSON format."
     )
+    user_prompt_text = f"""
+### Difficulty Definition
+{difficulty_definitions[difficulty]}
+---
+### Detailed SAT Syllabus (for reference)
+{json.dumps(DETAILED_SYLLABUS.get(section, {}), indent=2)}
+---
+### Reference Text (for thematic inspiration)
+{chunk}
+---
+### Instructions
+Generate exactly {num_questions} questions that match the '{difficulty}' difficulty definition.
+If an image is provided, ensure the question is directly related to the image.
+"""
+    
+    user_content = [{"type": "text", "text": user_prompt_text}]
 
-    user_prompt = f"""
-
-    ### DETAILED SAT SYLLABUS
-
-    {formatted_syllabus}
-
-    ---
-    ### REFERENCE TEXT (for thematic inspiration)
-
-    {chunk}
-        ---
-
-    Difficulty: {difficulty}
-    Number of Questions: {num_questions}
-    """
+    if image_url:
+        print(f"INFO: Generating question with image: {image_url}")
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": image_url}
+        })
 
     resp = openai.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_content}
         ],
-        temperature=0.2, # A little creativity might be good
-        response_format={"type": "json_object"} # Use json_object for better reliability
+        temperature=0.4,
+        response_format={"type": "json_object"}
     )
 
     try:
-        # Note: The model might return a dictionary with a key like "questions"
-        # that contains the list. Adjust parsing as needed.
         content = json.loads(resp.choices[0].message.content)
-        mcqs = content.get("questions", content) # Adapt to the model's output format
-
+        mcqs = content.get("questions", content)
         for q in mcqs:
             q["difficulty"] = difficulty
             q["section"] = section
-            # Call the new tagging function
+            if image_url:
+                q["image_url"] = image_url
             q["tags"] = tag_question_by_concept(q["question_text"], section)
         return mcqs
     except Exception as e:
         print(f"Error parsing MCQs from model output: {e}")
-        print("Model Response:", resp.choices[0].message.content)
         return []

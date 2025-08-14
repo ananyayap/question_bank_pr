@@ -1,8 +1,8 @@
 import uuid
-from typing import List
+from typing import List, Optional
 
 class Question:
-    def __init__(self, question_text: str, options: dict, correct: str, difficulty: str, section: str, tags: List[str]):
+    def __init__(self, question_text: str, options: dict, correct: str, difficulty: str, section: str, tags: List[str], image_url: Optional[str] = None):
         self.question_id = str(uuid.uuid4())  # unique id
         self.question_text = question_text
         self.options = options  # {"A": "...", "B": "...", ...}
@@ -10,6 +10,7 @@ class Question:
         self.difficulty = difficulty  # "easy" / "medium" / "hard"
         self.section = section  # "maths" / "reading" / "writing"
         self.tags = tags
+        self.image_url = image_url 
 
     def to_dict(self):
         return {
@@ -19,7 +20,8 @@ class Question:
             "correct": self.correct,
             "difficulty": self.difficulty,
             "section": self.section,
-            "tags": self.tags
+            "tags": self.tags,
+            "image_url": self.image_url
         }
 
     @staticmethod
@@ -30,5 +32,6 @@ class Question:
             correct=data["correct"],
             difficulty=data["difficulty"],
             section=data["section"],
-            tags=data["tags"]
+            tags=data["tags"],
+            image_url=data.get("image_url")  # Optional field
         )
