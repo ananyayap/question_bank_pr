@@ -1,4 +1,4 @@
-import fitz  # PyMuPDF
+import fitz  
 from pipeline.pipeline import generate_mcqs
 from database.firebase import upload_question, create_quiz_entry
 from config.settings import SECTIONS, DIFFICULTIES
